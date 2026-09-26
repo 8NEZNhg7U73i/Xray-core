@@ -86,6 +86,14 @@ func (dl *DefaultListener) Listen(ctx context.Context, addr net.Addr, sockopt *S
 	case *net.TCPAddr:
 		network = addr.Network()
 		address = addr.String()
+
+		if sockopt != nil &&
+			sockopt.V6Only &&
+			addr.IP != nil &&
+			addr.IP.To4() == nil {
+			network = "tcp6"
+		}
+
 		lc.Control = getControlFunc(ctx, sockopt, dl.controllers)
 		// default disable keepalive
 		lc.KeepAlive = -1
@@ -175,10 +183,22 @@ func (dl *DefaultListener) Listen(ctx context.Context, addr net.Addr, sockopt *S
 
 func (dl *DefaultListener) ListenPacket(ctx context.Context, addr net.Addr, sockopt *SocketConfig) (net.PacketConn, error) {
 	var lc net.ListenConfig
+	network := addr.Network()
+
+	if sockopt != nil {
+		switch a := addr.(type) {
+		case *net.UDPAddr:
+			if sockopt.V6Only &&
+				a.IP != nil &&
+				a.IP.To4() == nil {
+				network = "udp6"
+			}
+		}
+	}
 
 	lc.Control = getControlFunc(ctx, sockopt, dl.controllers)
 
-	return lc.ListenPacket(ctx, addr.Network(), addr.String())
+	return lc.ListenPacket(ctx, network, addr.String())
 }
 
 // RegisterListenerController adds a controller to the effective system listener.
